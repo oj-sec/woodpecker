@@ -11,17 +11,23 @@
 from pyrogram import Client
 import asyncio
 import json
+import requests
+import argparse
+import os
 
-# Function to initialise a Telegram client for a given bot session
-def initialise(bot_token):
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+# Function to initialise a Telegram client for a given bot token
+def initialise_bot(bot_token):
 	config = read_config()
 	api_id = config['telegramApiId']
 	api_hash = config['telegramApiHash']
-	output = ""
+	output_config = ""
 	if "output" in config.keys():
-		output = config['output']
+		output_config = config['output']
 	bot = Client("bot", api_id, api_hash, bot_token=bot_token) 
-	return bot, output
+	return bot, output_config
 
 # Function to read config.ini file.
 def read_config():
@@ -47,12 +53,23 @@ async def get_user(bot, username="me"):
 		user = await bot.get_users(username)
 		return user
 
+# Function to get the bot commands 
+async def get_bot_commands(bot):
+
+	async with bot:
+		commands = await bot.get_bot_commands()
+		return commands
+
+# Function to issue a series of commands to purge the chat and cycle the bot token. 
+#async def killer_poke(bot, chat_id=None):
+
 # Async iterator for all messages the given chat
 async def message_iterator(bot, chat_id, output, ticker=0):
 
 	async with bot:
 
 		ticker = 1
+		flag = 0
 
 		while True:
 			iterator = []
@@ -60,45 +77,76 @@ async def message_iterator(bot, chat_id, output, ticker=0):
 				iterator.append(ticker + i)
 			messages = await bot.get_messages(chat_id, iterator)
 
-			flag = False
 
 			for message in messages:
 				message = json.loads(str(message))
 				if "empty" in message.keys():
 					if message['empty'] == True:
+						print("Encountered empty message.")
 						flag = flag + 1
-						break
 				else:
-					print(message)
-					writer(message)
+					writer(message, output)
 
 			# Exit iterator if 200 empty messages in a row are encountered
 			# Potentially naive break condition - needs testing
 			if flag == 200:
+				print("Breaking due to 200 concurrent empty messages.")
 				break
 
 			ticker = ticker + 200
 
 	return 
 
-def writer(message):
-	with open("test3", 'a') as f:
-		json.dump(message, f)
-		f.write("\n")
+# Function to handle result outputs
+def writer(message, output):
+
+	print(message)
+
+	if output:
+		if output['mode'] == "file":
+			with open(output['destination'], "a") as f:
+				f.write(message)
+				f.write("\n")
+		elif output['mode'] == "elastic":
+			r = requests.post(output['destination'], headers={'Authorization': 'ApiKey ' + output['authorisation'], 'Content-Type': 'application/json'}, data=json.dumps(message), verify=False)
+			print("\n")
+			print(r.text)
+			print("\n")
 
 # Entrypoint & main execution handler
 def main(bot_token, chat_id):
 
-	bot, output = initialise(bot_token)
-	loop = asyncio.get_event_loop()
-	chat = loop.run_until_complete(get_chat(bot, chat_id))
-	chat_member = loop.run_until_complete(get_user(bot, ""))
-	chat_member = loop.run_until_complete(get_user(bot, "me"))
+	try:
+		os.remove("bot.session")
+	except:
+		pass
 
-	print(chat_member)
-	quit()
+	bot, output_config = initialise_bot(bot_token)
+
+	print("Client created sucessfuly using bot token & configuration.")
+	loop = asyncio.get_event_loop()
+
+	bot_info = loop.run_until_complete(get_user(bot))
+	print("Bot information:")
+	print(bot_info)
+
+	chat = loop.run_until_complete(get_chat(bot, chat_id))
 
 	if chat:
+		print("Chat information:")
+		print(chat)
+		print("Iterating messages until empty:")
 
-		all_messages = loop.run_until_complete(message_iterator(bot, chat_id, output))
+		all_messages = loop.run_until_complete(message_iterator(bot, chat_id, output_config))
 
+	loop.close()
+
+if __name__ == "__main__":
+
+	parser = argparse.ArgumentParser(prog='Woodpecker',description="Telegram bot scraper & breaker.")
+	parser.add_argument('--bot', '-b', required=True, help='Required - token for the target bot.')
+	parser.add_argument('--chat', '-c', required=True, help='Required - chat ID for the tarket chat.')	
+
+	args = parser.parse_args()
+
+	main(args.bot, int(args.chat))
