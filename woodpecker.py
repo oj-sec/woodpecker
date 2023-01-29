@@ -64,11 +64,10 @@ async def get_bot_commands(bot):
 #async def killer_poke(bot, chat_id=None):
 
 # Async iterator for all messages the given chat
-async def message_iterator(bot, chat_id, output, ticker=0):
+async def message_iterator(bot, chat_id, output, ticker=1):
 
 	async with bot:
 
-		ticker = 1
 		flag = 0
 
 		while True:
@@ -145,7 +144,9 @@ if __name__ == "__main__":
 
 	parser = argparse.ArgumentParser(prog='Woodpecker',description="Telegram bot scraper & breaker.")
 	parser.add_argument('--bot', '-b', required=True, help='Required - token for the target bot.')
-	parser.add_argument('--chat', '-c', required=True, help='Required - chat ID for the tarket chat.')	
+	parser.add_argument('--chat', '-c', required=True, help='Required - chat ID for the tarket chat.')
+	#parser.add_argument('--offset', '-p', required=False, help='Optional - message ID to start iterating from [default zero].')
+	#parser.add_argument('--singular', '-s', required=False, help='Optional - retrieve a single message by message ID.')
 
 	args = parser.parse_args()
 
