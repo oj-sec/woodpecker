@@ -154,8 +154,9 @@ def main(bot_token, chat_id):
 	#chat = loop.run_until_complete(get_chat(bot, chat_id))
 	#print(chat)
 
-	#message =  loop.run_until_complete(get_message(bot, chat_id, 209627))
-	edit =  loop.run_until_complete(edit_message(bot, chat_id, 209627))
+	message =  loop.run_until_complete(get_message(bot, chat_id, 209627))
+	print(message)
+	#edit =  loop.run_until_complete(edit_message(bot, chat_id, 209627))
 	quit()
 
 	if chat:
@@ -170,11 +171,25 @@ def main(bot_token, chat_id):
 if __name__ == "__main__":
 
 	parser = argparse.ArgumentParser(prog='Woodpecker',description="Telegram bot scraper & breaker.")
+
+	# General flags
+	parser.add_argument('--mode', '-m', required=True, choices=('scrape', 'peck'))
 	parser.add_argument('--bot', '-b', required=True, help='Required - token for the target bot.')
 	parser.add_argument('--chat', '-c', required=True, help='Required - chat ID for the tarket chat.')
+	
+	# Scrape only flags
 	#parser.add_argument('--offset', '-p', required=False, help='Optional - message ID to start iterating from [default zero].')
 	#parser.add_argument('--singular', '-s', required=False, help='Optional - retrieve a single message by message ID.')
 
+	# Peck only flags
+	parser.add_argument('--only', '-o', required=False, choices=('dos', 'purge'),help='Optional - only do denial of service [dos] or purge messages [purge] - default is both.')
+
 	args = parser.parse_args()
 
-	main(args.bot, int(args.chat))
+	if args.mode == 'scrape':
+
+		main(args.bot, int(args.chat))
+
+	elif args.mode == 'peck':
+
+		pass
