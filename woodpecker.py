@@ -3,10 +3,6 @@
 # The Woodpecker is a Python utility for pulling data from Telegram phishing bots using Pyrogram. 
 
 # Requires an API ID and API hash from a valid Telegram account associated with a telephone number. 
-# Interacting with malicious accounts may get your Telegram account banned - use at your own risk. 
-
-# pyrogram-2.0.97
-# tgcrypto-1.2.5
 
 from pyrogram import Client
 import asyncio
@@ -14,6 +10,7 @@ import json
 import requests
 import argparse
 import os
+import time
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -60,11 +57,34 @@ async def get_bot_commands(bot):
 		commands = await bot.get_bot_commands()
 		return commands
 
-# Function to issue a series of commands to purge the chat and cycle the bot token. 
-#async def killer_poke(bot, chat_id=None):
+# Function to issue commands to purge the bot and deny service.
+def killer_poke(bot, token, chat_id=None):
+
+	if chat_id:	
+		pass
+
+	# Denial of service uses repeat requests to the logOut API endpoint, which times bots out for 10 minutes before they can log back in:
+	# https://core.telegram.org/bots/api
+	while(True):
+		dos = requests.get(f"https://api.telegram.org/bot{token}/logOut")
+		time.sleep(30)
+
+# Async function to edit message contents
+async def edit_message(bot, chat_id, message_id, new_message="🪵🐦"*2000):
+
+	async with bot:
+		edit = await bot.edit_message_text(chat_id, message_id, new_message)
+		return edit
+
+# Async retriever for a single message
+async def get_message(bot, chat_id, message_id):
+
+	async with bot:
+		message = await bot.get_messages(chat_id, message_id)
+		return message
 
 # Async iterator for all messages the given chat
-async def message_iterator(bot, chat_id, output, ticker=1):
+async def message_iterator(bot, chat_id, output, ticker=1, mode="scrape"):
 
 	async with bot:
 
@@ -76,7 +96,6 @@ async def message_iterator(bot, chat_id, output, ticker=1):
 				iterator.append(ticker + i)
 			messages = await bot.get_messages(chat_id, iterator)
 
-
 			for message in messages:
 				message = json.loads(str(message))
 				if "empty" in message.keys():
@@ -84,7 +103,10 @@ async def message_iterator(bot, chat_id, output, ticker=1):
 						print("Encountered empty message.")
 						flag = flag + 1
 				else:
-					writer(message, output)
+					if mode == "scrape":
+						writer(message, output)
+					elif mode == "purge":
+						edit_message(bot, chat_id, iterator)
 
 			# Exit iterator if 200 empty messages in a row are encountered
 			# Potentially naive break condition - needs testing
@@ -102,12 +124,12 @@ def writer(message, output):
 	print(message)
 
 	if output:
-		if output['mode'] == "file":
+		if output['file']:
 			with open(output['destination'], "a") as f:
 				f.write(message)
 				f.write("\n")
-		elif output['mode'] == "elastic":
-			r = requests.post(output['destination'], headers={'Authorization': 'ApiKey ' + output['authorisation'], 'Content-Type': 'application/json'}, data=json.dumps(message), verify=False)
+		if output['elasticLocation']:
+			r = requests.post(output['destination'], headers={'Authorization': 'ApiKey ' + output['elasticAuthorisation'], 'Content-Type': 'application/json'}, data=json.dumps(message), verify=False)
 			print("\n")
 			print(r.text)
 			print("\n")
@@ -125,11 +147,16 @@ def main(bot_token, chat_id):
 	print("Client created sucessfuly using bot token & configuration.")
 	loop = asyncio.get_event_loop()
 
-	bot_info = loop.run_until_complete(get_user(bot))
-	print("Bot information:")
-	print(bot_info)
+	#bot_info = loop.run_until_complete(get_user(bot))
+	#print("Bot information:")
+	#print(bot_info)
 
-	chat = loop.run_until_complete(get_chat(bot, chat_id))
+	#chat = loop.run_until_complete(get_chat(bot, chat_id))
+	#print(chat)
+
+	#message =  loop.run_until_complete(get_message(bot, chat_id, 209627))
+	edit =  loop.run_until_complete(edit_message(bot, chat_id, 209627))
+	quit()
 
 	if chat:
 		print("Chat information:")
